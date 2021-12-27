@@ -1,3 +1,26 @@
+// The MIT License (MIT)
+
+// Copyright (c) 2017 Zalando SE
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
+
 function radar_visualization(config) {
 
   // custom random number generator, to make random sequence reproducible
@@ -66,7 +89,6 @@ function radar_visualization(config) {
     return Math.min(Math.max(value, low), high);
   }
 
-
   function bounded_ring(polar, r_min, r_max) {
     return {
       t: polar.t,
@@ -84,7 +106,7 @@ function radar_visualization(config) {
   function segment(quadrant, ring) {
     var polar_min = {
       t: quadrants[quadrant].radial_min * Math.PI,
-      r: ring == 0 ? 30 : rings[ring - 1].radius
+      r: ring === 0 ? 30 : rings[ring - 1].radius
     };
     var polar_max = {
       t: quadrants[quadrant].radial_max * Math.PI,
@@ -195,6 +217,20 @@ function radar_visualization(config) {
     .style("stroke", config.colors.grid)
     .style("stroke-width", 1);
 
+  // background color. Usage `.attr("filter", "url(#solid)")`
+  // SOURCE: https://stackoverflow.com/a/31013492/2609980
+  var defs = grid.append("defs");
+  var filter = defs.append("filter")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", 1)
+    .attr("height", 1)
+    .attr("id", "solid");
+  filter.append("feFlood")
+    .attr("flood-color", "rgb(0, 0, 0, 0.8)");
+  filter.append("feComposite")
+    .attr("in", "SourceGraphic");
+
   // draw rings
   for (var i = 0; i < rings.length; i++) {
     grid.append("circle")
@@ -211,7 +247,7 @@ function radar_visualization(config) {
         .attr("text-anchor", "middle")
         .style("fill", "#e5e5e5")
         .style("font-family", "Arial, Helvetica")
-        .style("font-size", 42)
+        .style("font-size", "42px")
         .style("font-weight", "bold")
         .style("pointer-events", "none")
         .style("user-select", "none");
@@ -221,7 +257,7 @@ function radar_visualization(config) {
   function legend_transform(quadrant, ring, index=null) {
     var dx = ring < 2 ? 0 : 120;
     var dy = (index == null ? -16 : index * 12);
-    if (ring % 2 == 1) {
+    if (ring % 2 === 1) {
       dy = dy + 36 + segmented[quadrant][ring-1].length * 12;
     }
     return translate(
@@ -238,15 +274,15 @@ function radar_visualization(config) {
       .attr("transform", translate(title_offset.x, title_offset.y))
       .text(config.title)
       .style("font-family", "Arial, Helvetica")
-      .style("font-size", "34");
+      .style("font-size", "34px");
 
     // footer
     radar.append("text")
       .attr("transform", translate(footer_offset.x, footer_offset.y))
-      .text("▲ moved out     ▼ moved in")
+      .text("▲ moved up     ▼ moved down")
       .attr("xml:space", "preserve")
       .style("font-family", "Arial, Helvetica")
-      .style("font-size", "10");
+      .style("font-size", "10px");
 
     // legend
     var legend = radar.append("g");
@@ -258,27 +294,30 @@ function radar_visualization(config) {
         ))
         .text(config.quadrants[quadrant].name)
         .style("font-family", "Arial, Helvetica")
-        .style("font-size", "18");
+        .style("font-size", "18px");
       for (var ring = 0; ring < 4; ring++) {
         legend.append("text")
           .attr("transform", legend_transform(quadrant, ring))
           .text(config.rings[ring].name)
           .style("font-family", "Arial, Helvetica")
-          .style("font-size", "12")
+          .style("font-size", "12px")
           .style("font-weight", "bold");
         legend.selectAll(".legend" + quadrant + ring)
           .data(segmented[quadrant][ring])
           .enter()
             .append("a")
-              .attr("xlink:href", function(d) {return d.link})
-              .style("cursor", "pointer")
+                .attr("href", function (d, i) {
+                  return d.link ? d.link : "#"; // stay on same page if no link was provided
+                })
             .append("text")
-              .attr("class", "legend" + quadrant + ring)
               .attr("transform", function(d, i) { return legend_transform(quadrant, ring, i); })
+              .attr("class", "legend" + quadrant + ring)
+              .attr("id", function(d, i) { return "legendItem" + d.id; })
               .text(function(d, i) { return d.id + ". " + d.label; })
-              .classed("legend_text", true)
               .style("font-family", "Arial, Helvetica")
-              .style("font-size", "11");
+              .style("font-size", "11px")
+              .on("mouseover", function(d) { showBubble(d); highlightLegendItem(d); })
+              .on("mouseout", function(d) { hideBubble(d); unhighlightLegendItem(d); });
       }
     }
   }
@@ -331,21 +370,34 @@ function radar_visualization(config) {
       .style("opacity", 0);
   }
 
+  function highlightLegendItem(d) {
+    var legendItem = document.getElementById("legendItem" + d.id);
+    legendItem.setAttribute("filter", "url(#solid)");
+    legendItem.setAttribute("fill", "white");
+  }
+
+  function unhighlightLegendItem(d) {
+    var legendItem = document.getElementById("legendItem" + d.id);
+    legendItem.removeAttribute("filter");
+    legendItem.removeAttribute("fill");
+  }
+
   // draw blips on radar
   var blips = rink.selectAll(".blip")
     .data(config.entries)
     .enter()
       .append("g")
         .attr("class", "blip")
-        .on("mouseover", showBubble)
-        .on("mouseout", hideBubble);
+        .attr("transform", function(d, i) { return legend_transform(d.quadrant, d.ring, i); })
+        .on("mouseover", function(d) { showBubble(d); highlightLegendItem(d); })
+        .on("mouseout", function(d) { hideBubble(d); unhighlightLegendItem(d); });
 
   // configure each blip
   blips.each(function(d) {
     var blip = d3.select(this);
 
     // blip link
-    if (d.active && d.hasOwnProperty("link")) {
+    if (!config.print_layout && d.active && d.hasOwnProperty("link")) {
       blip = blip.append("a")
         .attr("xlink:href", d.link);
     }
@@ -374,7 +426,7 @@ function radar_visualization(config) {
         .attr("text-anchor", "middle")
         .style("fill", "#fff")
         .style("font-family", "Arial, Helvetica")
-        .style("font-size", function(d) { return blip_text.length > 2 ? "8" : "9"; })
+        .style("font-size", function(d) { return blip_text.length > 2 ? "8px" : "9px"; })
         .style("pointer-events", "none")
         .style("user-select", "none");
     }
